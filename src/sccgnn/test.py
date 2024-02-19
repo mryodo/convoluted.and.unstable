@@ -1,3 +1,4 @@
+# %%
 # package testing framework 
 from importlib import reload
 from datetime import datetime
@@ -61,8 +62,8 @@ y = output_generator( m1, W1, edg2Trig, var = var )
 y_real = y.clone()
 
 # define missing entries
-dropRate = 0.125
-valRate = 0.125
+dropRate = 0.2
+valRate = 0.2
 
 ind, val_ind, saved = get_missing( m1, dropRate, valRate )
 fillerValue = torch.median( y[ saved ] )
@@ -79,7 +80,7 @@ verbose = False
 variance = 3.0
 p = 0.75
 MAX_EPOCH = 2500
-is_classical = False
+is_classical = True
 
 model = SCCGNN( K = K, L = L, variance = 3.0 ) #initiate model
 learning_rate = 0.02 # I don't fucking know how much is better
@@ -92,6 +93,7 @@ else:
 
 my_loss = [] # we store losses per epoch here
 my_acc = [] # we store accuracies per epoch here
+my_val_acc = []
 
 y_norm = [ torch.linalg.norm( P1( y - y_real, B1w, b1b1t_inv ) ).item() ]
 z_norm = [ torch.linalg.norm( P2( y - y_real, B2w, b2tb2_inv ) ).item() ]
@@ -132,22 +134,33 @@ for epoch in range( MAX_EPOCH ):
       h_norm.append( torch.linalg.norm( out - y_real - P1( out - y_real, B1w, b1b1t_inv ) - P2( out - y_real, B2w, b2tb2_inv ) ).item() )
 
       val_acc = my_val_accuracy( out, y_real.reshape(-1, 1), val_ind )
+      my_val_acc.append( val_acc )
 
-      if val_acc > best_acc:
+      if val_acc > best_acc and epoch > 0.9 * MAX_EPOCH:
       #best_loss = my_loss[-1]
             best_acc = val_acc
             if is_classical:
-                  model_path = 'model_dump/model_{}_N{}_K{}_L{}_classical'.format(timestamp, N, K, L)  # we may want to change the name...
+                  model_path_val = '../../model_dump/BVA_model_{}_N{}_K{}_L{}_classical'.format(timestamp, N, K, L)  # we may want to change the name...
             else:
-                  model_path = 'model_dump/model_{}_N{}_K{}_L{}_smart_{}|{}'.format(timestamp, N, K, L, α1, α2)  # we may want to change the name...
-            torch.save(model.state_dict(), model_path)
+                  model_path_val = '../../model_dump/BVA_model_{}_N{}_K{}_L{}_smart_{}|{}'.format(timestamp, N, K, L, α1, α2)  # we may want to change the name...
+            torch.save(model.state_dict(), model_path_val)
+     
+      if best_loss > my_loss[-1]: #and epoch > 0.5 * MAX_EPOCH:
+            best_loss = my_loss[-1]
+            #best_acc = val_acc
+            if is_classical:
+                  model_path_loss = '../../model_dump/BL_model_{}_N{}_K{}_L{}_classical'.format(timestamp, N, K, L)  # we may want to change the name...
+            else:
+                  model_path_loss = '../../model_dump/BL_model_{}_N{}_K{}_L{}_smart_{}|{}'.format(timestamp, N, K, L, α1, α2)  # we may want to change the name...
+            torch.save(model.state_dict(), model_path_loss)
+
 
       if verbose:
             if epoch % 20 == 0:
                   print(' epoch{}  ||   loss: {}, accuracy: {}'.format(epoch, my_loss[-1], my_acc[-1]))
 
 model = SCCGNN( K = K, L = L, variance = 3.0 )
-model.load_state_dict( torch.load(model_path) )
+model.load_state_dict( torch.load(model_path_val) )
 model.eval()
 out = model(LdStack, LuStack, y.reshape(-1, 1) )
 fin_loss = criterion( out, y_real)
@@ -158,8 +171,48 @@ fin_h_norm = torch.linalg.norm( out - y_real - P1( out - y_real, B1w, b1b1t_inv 
 
 print()
 print("--------------------------------------")
-print(round(fin_acc.item(), 4), #round(fin_loss.item(),4), round(fin_y_norm,4), round(fin_z_norm,4), round(fin_h_norm,4), 
-      round(fin_acc.item()/max(my_acc).item(),4), round(best_acc.item()/max(my_acc).item(),4) )
+print("BEST VALIDATION MODEL:")
+print("acc: ", round(fin_acc.item(), 4), #round(fin_loss.item(),4), round(fin_y_norm,4), round(fin_z_norm,4), round(fin_h_norm,4), 
+      "  acc/best test: ", round(fin_acc.item()/max(my_acc).item(),4), "  best val acc/best test: ", round(best_acc.item()/max(my_acc).item(),4) )
+
+model = SCCGNN( K = K, L = L, variance = 3.0 )
+model.load_state_dict( torch.load(model_path_loss) )
+model.eval()
+out = model(LdStack, LuStack, y.reshape(-1, 1) )
+fin_loss = criterion( out, y_real)
+fin_acc =  my_accuracy( out, y_real.reshape(-1, 1), ind )
+fin_y_norm = torch.linalg.norm( P1( out - y_real, B1w, b1b1t_inv ) ).item()
+fin_z_norm = torch.linalg.norm( P2( out - y_real, B2w, b2tb2_inv ) ).item()
+fin_h_norm = torch.linalg.norm( out - y_real - P1( out - y_real, B1w, b1b1t_inv ) - P2( out - y_real, B2w, b2tb2_inv ) ).item()
+
+
+print()
+print("BEST LOSS MODEL:")
+print("acc: ", round(fin_acc.item(), 4), #round(fin_loss.item(),4), round(fin_y_norm,4), round(fin_z_norm,4), round(fin_h_norm,4), 
+      "  acc/best test: ", round(fin_acc.item()/max(my_acc).item(),4), "  best val acc/best test: ", round(best_acc.item()/max(my_acc).item(),4) )
 print( "time: ", str(timedelta(seconds = time()-begin_time)) )
 print("--------------------------------------")
 print()
+
+#%%
+import matplotlib.pyplot as plt
+import matplotx
+plt.rc('font', size=15)
+# use everywhere:
+plt.style.use(matplotx.styles.dufte)
+
+f, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize = (10, 8))
+ax1.semilogy(my_loss, label="losses")
+matplotx.line_labels(ax=ax1)  # line labels to the right
+#ax1.legend()
+ax2.plot(my_acc, label="accuracies")
+ax2.plot(my_val_acc, label="val accs")
+ax2.set_yscale('symlog')
+#matplotx.line_labels(ax=ax2)  # line labels to the right
+ax2.set_ylim((-1, 1))
+#ax2.legend()
+plt.show()
+
+
+
+# %%
