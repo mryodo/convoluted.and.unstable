@@ -37,7 +37,7 @@ print("Running on: ", device)
 
 
 
-N = 60  # size of simplicial complex
+N = 100  # size of simplicial complex
 
 # IMPORTANT: stable / non-stable flag inside `generateTriangulation`
 Ld, Lu, B1w, B2w, W0inv, W1, W2, edges, trians, n, points, edg2Trig, trig2Edge = generateTriangulation( N, instable = False )
@@ -63,7 +63,7 @@ y_real = y.clone()
 
 # define missing entries
 dropRate = 0.2
-valRate = 0.2
+valRate = 0.1
 
 ind, val_ind, saved = get_missing( m1, dropRate, valRate )
 fillerValue = torch.median( y[ saved ] )
@@ -72,7 +72,7 @@ y[ ind ] = fillerValue
 
 L = 10
 α1 = 10.0 # parameters for smart loss. Will not affect classical
-α2 = 30.0
+α2 = 50.0
 
 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
@@ -80,7 +80,7 @@ verbose = False
 variance = 3.0
 p = 0.75
 MAX_EPOCH = 2500
-is_classical = True
+is_classical = False
 
 model = SCCGNN( K = K, L = L, variance = 3.0 ) #initiate model
 learning_rate = 0.02 # I don't fucking know how much is better
