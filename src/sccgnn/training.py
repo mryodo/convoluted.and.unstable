@@ -59,7 +59,7 @@ def form_epoch_data( y, y_real, saved, fillerValue, p = 0.75, device = "cpu" ):
       tries = int( 4 * round( log( y.shape[0] ) / p ) )
       mask = torch.zeros( y.shape[0], tries , device = device)
       for i in range( tries ):
-            mask[:, i] = generate_mask( p, y, saved )
+            mask[:, i] = generate_mask( p, y, saved, device = device )
       mask[ mask == 0 ] = fillerValue
 
       return [ ( mask[ :, i ], y_real )  for i in range(tries) ]

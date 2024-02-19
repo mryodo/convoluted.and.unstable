@@ -105,7 +105,7 @@ begin_time = time()
 for epoch in range( MAX_EPOCH ):
       model.train(True)
 
-      data = form_epoch_data( y, y_real, saved, fillerValue, p)
+      data = form_epoch_data( y, y_real, saved, fillerValue, p, device = device)
       running_loss = 0.
       last_loss = 0.
       for i, data_point in enumerate( data ):
@@ -158,7 +158,8 @@ fin_h_norm = torch.linalg.norm( out - y_real - P1( out - y_real, B1w, b1b1t_inv 
 
 print()
 print("--------------------------------------")
-print(round(fin_acc.item(), 4), round(fin_loss.item(),4), round(fin_y_norm,4), round(fin_z_norm,4), round(fin_h_norm,4), round(fin_acc.item()/max(my_acc).item(),4) )
+print(round(fin_acc.item(), 4), #round(fin_loss.item(),4), round(fin_y_norm,4), round(fin_z_norm,4), round(fin_h_norm,4), 
+      round(fin_acc.item()/max(my_acc).item(),4), round(best_acc.item()/max(my_acc).item(),4) )
 print( "time: ", str(timedelta(seconds = time()-begin_time)) )
 print("--------------------------------------")
 print()
