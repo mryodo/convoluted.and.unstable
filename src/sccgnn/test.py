@@ -5,6 +5,9 @@ from datetime import datetime
 from datetime import timedelta
 from time import time
 
+from tqdm import trange
+
+
 import warnings
 warnings.filterwarnings("ignore", message="Sparse CSR tensor support is in beta state.")
 
@@ -82,7 +85,7 @@ p = 0.75
 MAX_EPOCH = 2500
 is_classical = False
 
-model = SCCGNN( K = K, L = L, variance = 3.0 ) #initiate model
+model = SCCGNN( K = K, L = L, variance = 1.0 ) #initiate model
 learning_rate = 0.02 # I don't fucking know how much is better
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -104,7 +107,7 @@ best_acc = -1000.0
 
 begin_time = time()
 
-for epoch in range( MAX_EPOCH ):
+for epoch in trange(MAX_EPOCH, desc="EPOCHS"):
       model.train(True)
 
       data = form_epoch_data( y, y_real, saved, fillerValue, p, device = device)
@@ -159,7 +162,7 @@ for epoch in range( MAX_EPOCH ):
             if epoch % 20 == 0:
                   print(' epoch{}  ||   loss: {}, accuracy: {}'.format(epoch, my_loss[-1], my_acc[-1]))
 
-model = SCCGNN( K = K, L = L, variance = 3.0 )
+model = SCCGNN( K = K, L = L, variance = 1.0 )
 model.load_state_dict( torch.load(model_path_val) )
 model.eval()
 out = model(LdStack, LuStack, y.reshape(-1, 1) )
@@ -175,7 +178,7 @@ print("BEST VALIDATION MODEL:")
 print("acc: ", round(fin_acc.item(), 4), #round(fin_loss.item(),4), round(fin_y_norm,4), round(fin_z_norm,4), round(fin_h_norm,4), 
       "  acc/best test: ", round(fin_acc.item()/max(my_acc).item(),4), "  best val acc/best test: ", round(best_acc.item()/max(my_acc).item(),4) )
 
-model = SCCGNN( K = K, L = L, variance = 3.0 )
+model = SCCGNN( K = K, L = L, variance = 1.0 )
 model.load_state_dict( torch.load(model_path_loss) )
 model.eval()
 out = model(LdStack, LuStack, y.reshape(-1, 1) )
