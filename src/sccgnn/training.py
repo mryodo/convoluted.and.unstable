@@ -30,6 +30,13 @@ def my_accuracy( output, target, ind  ):
       accuracy.update( output[ind], target[ind] )
       return accuracy.compute()
 
+def MAPE( output, target, ind ):
+    abs_error = (torch.abs(target[ind] - output[ind])) / target[ind]
+    sum_abs_error = torch.sum(abs_error)
+    mape_loss = (sum_abs_error / target[ind].shape[0]) * 100
+    return mape_loss
+
+
 def my_val_accuracy( output, target, val_ind  ):
       
       accuracy = R2Score( )

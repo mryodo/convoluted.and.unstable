@@ -1,17 +1,25 @@
 import torch.nn as nn
 import torch
 
+def initial_weights(in_size, out_size, K, gamma = 0.2, variance = 1.0, device = "cpu"):
+      tmp = variance*torch.rand((in_size, out_size, K), device = device)
+      for i in range(1, K):
+            tmp[:, :, i] = (gamma**i) * tmp[:, :, i]  
+      return tmp
 #LAYER
 class SC( nn.Module ):
-      def __init__(self, in_size, out_size, K, variance = 1.0, device = "cpu"):
+      def __init__(self, in_size, out_size, K, variance = 1.0, device = "cpu", gamma = 0.1):
             super().__init__()
             self.device = device
             self.in_size = in_size
             self.out_size = out_size
             self.K = K
-            self.coeff_P = nn.parameter.Parameter(variance*torch.randn((self.in_size, self.out_size, self.K), device = device))
-            self.coeff_Q = nn.parameter.Parameter(variance*torch.randn((self.in_size, self.out_size, self.K), device = device))
+            self.gamma = gamma
+            self.variance = variance
+            self.coeff_P = nn.parameter.Parameter(initial_weights(self.in_size, self.out_size, self.K, gamma = self.gamma, variance = self.variance , device = self.device ) )
+            self.coeff_Q = nn.parameter.Parameter(initial_weights(self.in_size, self.out_size, self.K, gamma = self.gamma, variance = self.variance , device = self.device ) )
 
+            
 
       def forward(self, LdStack, LuStack, x):
             # here we need to write the assemble of the polynomial MAY BE NOT OPTIMAL

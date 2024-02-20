@@ -37,3 +37,10 @@ def build_stacks( m1, Ld, Lu, K = 5, device = "cpu" ):
             LuStack[ :, :, i ] = LuStack[ :, :, i - 1 ] @ Lu
 
       return LdStack, LuStack
+
+
+def initial_weights(in_size, out_size, K, gamma = 0.2, variance = 1.0, device = "cpu"):
+      tmp = variance*torch.rand((in_size, out_size, K), device = device)
+      for i in range(1, K):
+            tmp[:, :, i] = (gamma**i) * tmp[:, :, i]  
+      return tmp
