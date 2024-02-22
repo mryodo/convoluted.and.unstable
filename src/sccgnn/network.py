@@ -27,15 +27,15 @@ class SC( nn.Module ):
 
 #NETWORK
 class SCCGNN( nn.Module ):
-      def __init__(self, K = 5, L = 3, variance = 0.01 ):
+      def __init__(self, K = 5, L = 3, variance = 0.01, device = "cpu" ):
             super().__init__()
             self.L = L
             self.variance = variance
             self.K = K
-
-            self.SC_1 = SC(in_size = 1, out_size = self.L, K = self.K, variance=self.variance)
-            self.SC_2 = SC(in_size = self.L, out_size = self.L, K = self.K, variance=self.variance)
-            self.SC_3 = SC(in_size = self.L, out_size = 1, K = self.K, variance=self.variance)
+            self.device = device
+            self.SC_1 = SC(in_size = 1, out_size = self.L, K = self.K, variance=self.variance, device = self.device )
+            self.SC_2 = SC(in_size = self.L, out_size = self.L, K = self.K, variance=self.variance, device = self.device)
+            self.SC_3 = SC(in_size = self.L, out_size = 1, K = self.K, variance=self.variance, device = self.device)
 
       def forward( self, LdStack, LuStack, x ):
              out1_1 = self.SC_1( LdStack, LuStack, x )

@@ -43,17 +43,17 @@ print("Running on: ", device)
 N = 100  # size of simplicial complex
 
 # IMPORTANT: stable / non-stable flag inside `generateTriangulation`
-Ld, Lu, B1w, B2w, W0inv, W1, W2, edges, trians, n, points, edg2Trig, trig2Edge = generateTriangulation( N, instable = True )
+Ld, Lu, B1w, B2w, W0inv, W1, W2, edges, trians, n, points, edg2Trig, trig2Edge = generateTriangulation( N, instable = True, device = device )
 b1b1t_inv = torch.linalg.pinv( (B1w @ B1w.T).to_dense() ).to_sparse()
 b2tb2_inv = torch.linalg.pinv( (B2w.T @ B2w).to_dense() ).to_sparse()
-topeig = get_top_eig(Lu, Ld)
+topeig = get_top_eig(Lu, Ld, device = device)
 Ld = 1. / ( 1. * topeig ) * Ld #normalistion !!! MAY AFFECT CONVERGENCE / RATE OF CONVERGENCE
 Lu = 1. / ( 1. * topeig ) * Lu
 m1 = Ld.shape[0]
 
 # define the size of each filter
 K = 3
-LdStack, LuStack = build_stacks( m1, Ld, Lu, K )
+LdStack, LuStack = build_stacks( m1, Ld, Lu, K, device = device )
 
 print( condPlus( Ld ), condPlus( Lu ), condPlus( Ld + Lu ) ) # check: if unstable, big numbers, if stable -- "decent"
 print("--------------------------------------")
@@ -61,32 +61,34 @@ print()
 
 # generate target output
 var = 0.01
-y = output_generator( m1, W1, edg2Trig, var = var )
+y = output_generator( m1, W1, edg2Trig, var = var, device = device )
 y_real = y.clone()
 
 # define missing entries
 dropRate = 0.2
 valRate = 0.2
 
-ind, val_ind, saved = get_missing( m1, dropRate, valRate )
+ind, val_ind, saved = get_missing( m1, dropRate, valRate, device = device )
 fillerValue = torch.median( y[ saved ] )
 y[ ind ] = fillerValue
 
 
+#%%
+
 for i in range(3):
       L = 10
-      α1 = 10.0 # parameters for smart loss. Will not affect classical
-      α2 = 50.0
+      α1 = 15.0 # parameters for smart loss. Will not affect classical
+      α2 = 30.0
 
       timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
       verbose = False
       variance = 3.0
-      p = 0.75
-      MAX_EPOCH = 5000
-      is_classical = True
+      p = 0.9
+      MAX_EPOCH = 2500
+      is_classical = False
 
-      model = SCCGNN( K = K, L = L, variance = 1.0 ) #initiate model
+      model = SCCGNN( K = K, L = L, variance = 1.0, device = device ) #initiate model
       learning_rate = 0.02 # I don't fucking know how much is better
       optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -166,7 +168,7 @@ for i in range(3):
                   if epoch % 20 == 0:
                         print(' epoch{}  ||   loss: {}, accuracy: {}'.format(epoch, my_loss[-1], my_acc[-1]))
 
-      model = SCCGNN( K = K, L = L, variance = 1.0 )
+      model = SCCGNN( K = K, L = L, variance = 1.0, device = device )
       model.load_state_dict( torch.load(model_path_val) )
       model.eval()
       out = model(LdStack, LuStack, y.reshape(-1, 1) )
@@ -183,7 +185,7 @@ for i in range(3):
       print("acc: ", round(fin_acc.item(), 4), #round(fin_loss.item(),4), round(fin_y_norm,4), round(fin_z_norm,4), round(fin_h_norm,4), 
             "  acc/best test: ", round(fin_acc.item()/max(my_acc).item(),4), "  best val acc/best test: ", round(best_acc.item()/max(my_acc).item(),4) )
 
-      model = SCCGNN( K = K, L = L, variance = 1.0 )
+      model = SCCGNN( K = K, L = L, variance = 1.0, device = device )
       model.load_state_dict( torch.load(model_path_loss) )
       model.eval()
       out = model(LdStack, LuStack, y.reshape(-1, 1) )

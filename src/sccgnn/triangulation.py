@@ -46,7 +46,7 @@ def getTrig2Edge( edges2, trigs2, edg2Trig ):
       return trig2Edg
 
 
-def generateTriangulation( N = 10, instable = False ):
+def generateTriangulation( N = 10, instable = False, device = "cpu" ):
       points = np.random.rand( N, 2) * 0.8 + 0.1
       points = np.vstack([ points, np.array([ [ 0, 0], [1, 0], [0, 1], [1, 1]]) ])
 
@@ -76,6 +76,7 @@ def generateTriangulation( N = 10, instable = False ):
             eps = 1e-3
             w_e[9] = eps
             w_e[15] = eps
+            w_e[45] = eps
       w = np.array( [ np.min( w_e[ list( trig2Edge[i] ) ] )
             for i in range( trians.shape[0] )
       ] )
@@ -93,4 +94,4 @@ def generateTriangulation( N = 10, instable = False ):
       Ld = B1w.T @ B1w
       Lu = B2w @ B2w.T
 
-      return coo_to_torch( Ld ), coo_to_torch( Lu ), coo_to_torch( B1w ), coo_to_torch( B2w ), coo_to_torch( W0inv ), coo_to_torch( W1 ), coo_to_torch( W2 ), edges, trians, n, points, edg2Trig, trig2Edge
+      return coo_to_torch( Ld, device = device ), coo_to_torch( Lu , device = device), coo_to_torch( B1w, device = device ), coo_to_torch( B2w , device = device), coo_to_torch( W0inv , device = device), coo_to_torch( W1 , device = device), coo_to_torch( W2, device = device ), edges, trians, n, points, edg2Trig, trig2Edge
