@@ -14,16 +14,28 @@ def coo_to_torch( coo, device = "cpu" ):
       v = torch.FloatTensor(values)
       shape = coo.shape
 
-      return torch.sparse_coo_tensor(i, v, torch.Size(shape), device = device)
 
-def condPlus( Lu, thr = 1e-6 ):
-      lam = torch.linalg.eigvalsh(Lu.to_dense())
-      return lam[-1] / lam[torch.abs(lam) >  thr][0]
+      if device == torch.device("mps"):
+            return torch.tensor( coo.todense(), dtype = torch.float32, device = device )
+      else:
+            return torch.sparse_coo_tensor(i, v, torch.Size(shape), device = device)
+
+def condPlus( Lu, thr = 1e-6, device = "cpu" ):
+      if device == torch.device("mps"): 
+            lam = np.linalg.eigvalsh(Lu.numpy(force=True)) 
+            return lam[-1] / lam[np.abs(lam) >  thr][0]
+      else:
+            lam = torch.linalg.eigvalsh(Lu.to_dense())
+            return lam[-1] / lam[torch.abs(lam) >  thr][0]
 
 def get_top_eig( Lu, Ld, device = "cpu" ):
-     lamU = torch.linalg.eigvalsh(Lu.to_dense())
-     lamD = torch.linalg.eigvalsh(Ld.to_dense())
-     return torch.max( torch.tensor( [ lamU[-1], lamD[-1] ], device = device ) )
+      if device == torch.device("mps"):
+            lamU = np.linalg.eigvalsh(Lu.numpy(force=True))
+            lamD = np.linalg.eigvalsh(Ld.numpy(force=True))
+      else:
+            lamU = torch.linalg.eigvalsh(Lu.to_dense())
+            lamD = torch.linalg.eigvalsh(Ld.to_dense())
+      return torch.max( torch.tensor( [ lamU[-1], lamD[-1] ], device = device, dtype = torch.float32 ) )
 
 def build_stacks( m1, Ld, Lu, K = 5, device = "cpu" ):
       LdStack = torch.zeros( m1, m1, K, device = device )

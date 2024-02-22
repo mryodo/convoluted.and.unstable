@@ -35,6 +35,7 @@ from training import *
 torch.cuda.is_available()
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 device = "cpu"
+#device = torch.device("mps")
 print("Running on: ", device)
 
 
@@ -44,8 +45,15 @@ N = 100  # size of simplicial complex
 
 # IMPORTANT: stable / non-stable flag inside `generateTriangulation`
 Ld, Lu, B1w, B2w, W0inv, W1, W2, edges, trians, n, points, edg2Trig, trig2Edge = generateTriangulation( N, instable = True, device = device )
-b1b1t_inv = torch.linalg.pinv( (B1w @ B1w.T).to_dense() ).to_sparse()
-b2tb2_inv = torch.linalg.pinv( (B2w.T @ B2w).to_dense() ).to_sparse()
+
+
+if device == torch.device("mps"):
+      b1b1t_inv = torch.tensor( np.linalg.pinv( (B1w @ B1w.T).numpy(force = True) ), device = device, dtype = torch.float32) 
+      b2tb2_inv = torch.tensor( np.linalg.pinv( (B2w.T @ B2w).numpy(force = True) ), device = device, dtype = torch.float32) 
+else:
+      b1b1t_inv = torch.linalg.pinv( (B1w @ B1w.T).to_dense() ).to_sparse()
+      b2tb2_inv = torch.linalg.pinv( (B2w.T @ B2w).to_dense() ).to_sparse()
+
 topeig = get_top_eig(Lu, Ld, device = device)
 Ld = 1. / ( 1. * topeig ) * Ld #normalistion !!! MAY AFFECT CONVERGENCE / RATE OF CONVERGENCE
 Lu = 1. / ( 1. * topeig ) * Lu
@@ -55,7 +63,7 @@ m1 = Ld.shape[0]
 K = 3
 LdStack, LuStack = build_stacks( m1, Ld, Lu, K, device = device )
 
-print( condPlus( Ld ), condPlus( Lu ), condPlus( Ld + Lu ) ) # check: if unstable, big numbers, if stable -- "decent"
+print( condPlus( Ld, device = device ), condPlus( Lu, device = device  ), condPlus( Ld + Lu, device = device ) ) # check: if unstable, big numbers, if stable -- "decent"
 print("--------------------------------------")
 print()
 
@@ -72,7 +80,6 @@ ind, val_ind, saved = get_missing( m1, dropRate, valRate, device = device )
 fillerValue = torch.median( y[ saved ] )
 y[ ind ] = fillerValue
 
-
 #%%
 rep_best_loss = []
 rep_best_val = []
@@ -87,7 +94,7 @@ for i in range(10):
       variance = 3.0
       p = 0.9
       MAX_EPOCH = 2500
-      is_classical = False
+      is_classical = True
 
       model = SCCGNN( K = K, L = L, variance = 1.0, device = device ) #initiate model
       learning_rate = 0.02 # I don't fucking know how much is better
@@ -208,3 +215,5 @@ for i in range(10):
       #print()
 print(" loss: ", rep_best_loss)
 print(" val: ", rep_best_val)
+
+# %%
