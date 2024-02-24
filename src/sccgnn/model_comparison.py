@@ -44,7 +44,7 @@ print("Running on: ", device)
 N = 100  # size of simplicial complex
 
 # IMPORTANT: stable / non-stable flag inside `generateTriangulation`
-Ld, Lu, B1w, B2w, W0inv, W1, W2, edges, trians, n, points, edg2Trig, trig2Edge = generateTriangulation( N, instable = True, device = device )
+Ld, Lu, B1w, B2w, W0inv, W1, W2, edges, trians, n, points, edg2Trig, trig2Edge = generateTriangulation( N, instable = False, device = device )
 
 
 if device == torch.device("mps"):
@@ -59,8 +59,9 @@ Ld = 1. / ( 1. * topeig ) * Ld #normalistion !!! MAY AFFECT CONVERGENCE / RATE O
 Lu = 1. / ( 1. * topeig ) * Lu
 m1 = Ld.shape[0]
 
+#%%
 # define the size of each filter
-K = 3
+K = 5
 LdStack, LuStack = build_stacks( m1, Ld, Lu, K, device = device )
 
 print( condPlus( Ld, device = device ), condPlus( Lu, device = device  ), condPlus( Ld + Lu, device = device ) ) # check: if unstable, big numbers, if stable -- "decent"
@@ -70,15 +71,21 @@ print()
 # generate target output
 var = 0.01
 y = output_generator( m1, W1, edg2Trig, var = var, device = device )
+gr, curl, harm =  P1( y, B1w, b1b1t_inv) , P2( y, B2w, b2tb2_inv) , y - P1( y, B1w, b1b1t_inv) -  P2( y, B2w, b2tb2_inv) 
+y = gr / torch.norm(gr) + curl / torch.norm(curl) + harm / torch.norm(harm)
 y_real = y.clone()
 
 # define missing entries
-dropRate = 0.2
+dropRate = 0.2  
 valRate = 0.2
 
 ind, val_ind, saved = get_missing( m1, dropRate, valRate, device = device )
 fillerValue = torch.median( y[ saved ] )
 y[ ind ] = fillerValue
+print( "naive guess level: ", MAPE(y, y_real, ind) )
+print()
+
+
 
 #%%
 rep_best_loss = []
