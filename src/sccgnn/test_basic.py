@@ -5,6 +5,8 @@ from datetime import datetime
 from datetime import timedelta
 from time import time
 
+from math import *
+
 from tqdm import trange
 
 
@@ -54,6 +56,7 @@ m1 = Ld.shape[0]
 # define the size of each filter
 K = 3
 LdStack, LuStack = build_stacks( m1, Ld, Lu, K, device = device )
+LStack = LdStack + LuStack
 
 print( condPlus( Ld ), condPlus( Lu ), condPlus( Ld + Lu ) ) # check: if unstable, big numbers, if stable -- "decent"
 print("--------------------------------------")
@@ -65,8 +68,8 @@ y = output_generator( m1, W1, edg2Trig, var = var, device = device )
 y_real = y.clone()
 
 # define missing entries
-dropRate = 0.2
-valRate = 0.2
+dropRate = 0.25
+valRate = 0.25
 
 ind, val_ind, saved = get_missing( m1, dropRate, valRate, device = device )
 fillerValue = torch.median( y[ saved ] )
@@ -75,20 +78,20 @@ y[ ind ] = fillerValue
 
 #%%
 
-for i in range(3):
+for i in range(1):
       L = 10
-      α1 = 15.0 # parameters for smart loss. Will not affect classical
-      α2 = 30.0
+      α1 = 10.0 # parameters for smart loss. Will not affect classical
+      α2 = 50.0
 
       timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
       verbose = False
       variance = 3.0
-      p = 0.9
-      MAX_EPOCH = 2500
-      is_classical = False
+      p = 0.5
+      MAX_EPOCH = 1000
+      is_classical = True 
 
-      model = SCCGNN( K = K, L = L, variance = 1.0, device = device ) #initiate model
+      model = SCCGNNb( K = K, L = L, variance = 1.0, device = device ) #initiate model
       learning_rate = 0.02 # I don't fucking know how much is better
       optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -114,7 +117,7 @@ for i in range(3):
       for epoch in trange(MAX_EPOCH, desc="EPOCHS"):
             model.train(True)
 
-            data = form_epoch_data( y, y_real, saved, fillerValue, p, device = device)
+            data = form_epoch_data( y, y_real, saved, fillerValue, p, multiplier = 1, device = device)
             running_loss = 0.
             last_loss = 0.
             for i, data_point in enumerate( data ):
@@ -123,7 +126,7 @@ for i in range(3):
                   labels = labels.reshape(-1, 1)
                   optimizer.zero_grad()
 
-                  outputs = model(LdStack, LuStack, inputs)
+                  outputs = model(LStack, inputs)
                   loss = criterion(outputs, labels)
                   loss.backward()
                   optimizer.step()
@@ -134,7 +137,7 @@ for i in range(3):
 
             my_loss.append( last_loss )
             model.eval()
-            out = model(LdStack, LuStack, y.reshape(-1, 1) )
+            out = model(LStack, y.reshape(-1, 1) )
             #my_acc.append( my_accuracy( out, y_real.reshape(-1, 1), ind ) )
             my_acc.append( MAPE( out, y_real.reshape(-1, 1), ind ) )
             y_norm.append( torch.linalg.norm( P1( out - y_real, B1w, b1b1t_inv ) ).item() )
@@ -149,18 +152,18 @@ for i in range(3):
             #best_loss = my_loss[-1]
                   best_acc = val_acc
                   if is_classical:
-                        model_path_val = '../../model_dump/BVA_model_{}_N{}_K{}_L{}_classical'.format(timestamp, N, K, L)  # we may want to change the name...
+                        model_path_val = '../../model_dump/basic_BVA_model_{}_N{}_K{}_L{}_classical'.format(timestamp, N, K, L)  # we may want to change the name...
                   else:
-                        model_path_val = '../../model_dump/BVA_model_{}_N{}_K{}_L{}_smart_{}|{}'.format(timestamp, N, K, L, α1, α2)  # we may want to change the name...
+                        model_path_val = '../../model_dump/basic_BVA_model_{}_N{}_K{}_L{}_smart_{}|{}'.format(timestamp, N, K, L, α1, α2)  # we may want to change the name...
                   torch.save(model.state_dict(), model_path_val)
       
             if best_loss > my_loss[-1]: #and epoch > 0.5 * MAX_EPOCH:
                   best_loss = my_loss[-1]
                   #best_acc = val_acc
                   if is_classical:
-                        model_path_loss = '../../model_dump/BL_model_{}_N{}_K{}_L{}_classical'.format(timestamp, N, K, L)  # we may want to change the name...
+                        model_path_loss = '../../model_dump/basic_BL_model_{}_N{}_K{}_L{}_classical'.format(timestamp, N, K, L)  # we may want to change the name...
                   else:
-                        model_path_loss = '../../model_dump/BL_model_{}_N{}_K{}_L{}_smart_{}|{}'.format(timestamp, N, K, L, α1, α2)  # we may want to change the name...
+                        model_path_loss = '../../model_dump/basic_BL_model_{}_N{}_K{}_L{}_smart_{}|{}'.format(timestamp, N, K, L, α1, α2)  # we may want to change the name...
                   torch.save(model.state_dict(), model_path_loss)
 
 
@@ -168,10 +171,10 @@ for i in range(3):
                   if epoch % 20 == 0:
                         print(' epoch{}  ||   loss: {}, accuracy: {}'.format(epoch, my_loss[-1], my_acc[-1]))
 
-      model = SCCGNN( K = K, L = L, variance = 1.0, device = device )
+      model = SCCGNNb( K = K, L = L, variance = 1.0, device = device )
       model.load_state_dict( torch.load(model_path_val) )
       model.eval()
-      out = model(LdStack, LuStack, y.reshape(-1, 1) )
+      out = model(LStack, y.reshape(-1, 1) )
       fin_loss = criterion( out, y_real)
       #fin_acc =  my_accuracy( out, y_real.reshape(-1, 1), ind )
       fin_acc =  MAPE( out, y_real.reshape(-1, 1), ind )
@@ -185,16 +188,16 @@ for i in range(3):
       print("acc: ", round(fin_acc.item(), 4), #round(fin_loss.item(),4), round(fin_y_norm,4), round(fin_z_norm,4), round(fin_h_norm,4), 
             "  acc/best test: ", round(fin_acc.item()/max(my_acc).item(),4), "  best val acc/best test: ", round(best_acc.item()/max(my_acc).item(),4) )
 
-      model = SCCGNN( K = K, L = L, variance = 1.0, device = device )
+      model = SCCGNNb( K = K, L = L, variance = 1.0, device = device )
       model.load_state_dict( torch.load(model_path_loss) )
       model.eval()
-      out = model(LdStack, LuStack, y.reshape(-1, 1) )
+      out = model(LStack, y.reshape(-1, 1) )
       fin_loss = criterion( out, y_real)
       #fin_acc =  my_accuracy( out, y_real.reshape(-1, 1), ind )
       fin_acc =  MAPE( out, y_real.reshape(-1, 1), ind )
-      fin_y_norm = torch.linalg.norm( P1( out - y_real, B1w, b1b1t_inv ) ).item()
-      fin_z_norm = torch.linalg.norm( P2( out - y_real, B2w, b2tb2_inv ) ).item()
-      fin_h_norm = torch.linalg.norm( out - y_real - P1( out - y_real, B1w, b1b1t_inv ) - P2( out - y_real, B2w, b2tb2_inv ) ).item()
+      fin_y_norm2 = torch.linalg.norm( P1( out - y_real, B1w, b1b1t_inv ) ).item()
+      fin_z_norm2 = torch.linalg.norm( P2( out - y_real, B2w, b2tb2_inv ) ).item()
+      fin_h_norm2 = torch.linalg.norm( out - y_real - P1( out - y_real, B1w, b1b1t_inv ) - P2( out - y_real, B2w, b2tb2_inv ) ).item()
 
 
       print()
@@ -202,6 +205,18 @@ for i in range(3):
       print("acc: ", round(fin_acc.item(), 4), #round(fin_loss.item(),4), round(fin_y_norm,4), round(fin_z_norm,4), round(fin_h_norm,4), 
             "  acc/best test: ", round(fin_acc.item()/max(my_acc).item(),4), "  best val acc/best test: ", round(best_acc.item()/max(my_acc).item(),4) )
       print( "time: ", str(timedelta(seconds = time()-begin_time)) )
+      print()
+      print() 
+
+      print("RATIOS:")
+      nrm = sqrt(y_norm[0]**2 + z_norm[0]**2 + h_norm[0]**2)
+      print("initial: ", round(y_norm[0]/nrm, 4), "/", 
+      round(z_norm[0]/nrm, 4), "/", round(h_norm[0]/nrm, 4))
+      nrm = sqrt(fin_y_norm**2 + fin_z_norm**2 + fin_h_norm**2)
+      print("initial: ", round(fin_y_norm/nrm, 4), "/", round(fin_z_norm/nrm, 4), "/", round(fin_h_norm/nrm, 4))
+      nrm = sqrt(fin_y_norm2**2 + fin_z_norm2**2 + fin_h_norm2**2)
+      print("initial: ", round(fin_y_norm2/nrm, 4), "/", round(fin_z_norm2/nrm, 4), "/", round(fin_h_norm2/nrm, 4)) 
+
       print("--------------------------------------")
       print()
 
@@ -225,3 +240,7 @@ ax2.set_yscale('symlog')
 plt.show()
 
 
+
+# %%
+
+# %%
