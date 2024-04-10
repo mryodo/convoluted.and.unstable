@@ -42,6 +42,7 @@ print("Running on: ", device)
 
 
 
+
 N = 100  # size of simplicial complex
 
 # IMPORTANT: stable / non-stable flag inside `generateTriangulation`
@@ -51,7 +52,7 @@ b2tb2_inv = torch.linalg.pinv( (B2w.T @ B2w).to_dense() ).to_sparse()
 topeig = get_top_eig(Lu, Ld, device = device)
 Ld = 1. / ( 1. * topeig ) * Ld #normalistion !!! MAY AFFECT CONVERGENCE / RATE OF CONVERGENCE
 Lu = 1. / ( 1. * topeig ) * Lu
-m1 = Ld.shape[0]
+m1 = Ld.shape[0]  
 
 # define the size of each filter
 K = 3
@@ -68,31 +69,51 @@ y = output_generator( m1, W1, edg2Trig, var = var, device = device )
 y_real = y.clone()
 
 # define missing entries
-dropRate = 0.25
-valRate = 0.25
+dropRate = 0.250
+valRate = 0.125
 
 ind, val_ind, saved = get_missing( m1, dropRate, valRate, device = device )
 fillerValue = torch.median( y[ saved ] )
 y[ ind ] = fillerValue
 
 
+testing_loop = [
+      [ True, 0,  0],
+      [ False, 1, 1/5],
+      [ False, 1/5, 1/5],
+      [ False, 1, 1/10],
+      [ False, 1/5, 1/10],
+      [ False, 1/10, 1/10],
+      [ False, 1, 5],
+      [ False, 1, 10],
+      [ False, 5, 5],
+      [ False, 5, 10],
+      [ False, 10, 10],
+      [ False, 10, 20],
+      [ False, 20, 20],
+      [ False, 10, 40],
+      [ False, 20, 40],
+]
+
+
+
 #%%
 
-for i in range(1):
-      L = 10
-      α1 = 10.0 # parameters for smart loss. Will not affect classical
-      α2 = 50.0
+for is_classical, α1, α2 in testing_loop:
+      L = 3
+      #α1 = 10.0 # parameters for smart loss. Will not affect classical
+      #α2 = 50.0
 
       timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
       verbose = False
-      variance = 3.0
+      variance = 1.0
       p = 0.5
-      MAX_EPOCH = 1000
-      is_classical = True 
+      MAX_EPOCH = 750
+      #is_classical = False 
 
-      model = SCCGNNb( K = K, L = L, variance = 1.0, device = device ) #initiate model
-      learning_rate = 0.02 # I don't fucking know how much is better
+      model = SCCGNNd( K = K, L = L, variance = 1.0, device = device ) #initiate model
+      learning_rate = 0.05 # I don't fucking know how much is better
       optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
       if is_classical:
@@ -114,7 +135,7 @@ for i in range(1):
 
       begin_time = time()
 
-      for epoch in trange(MAX_EPOCH, desc="EPOCHS"):
+      for epoch in range(MAX_EPOCH):#, desc="EPOCHS"):
             model.train(True)
 
             data = form_epoch_data( y, y_real, saved, fillerValue, p, multiplier = 1, device = device)
@@ -126,7 +147,8 @@ for i in range(1):
                   labels = labels.reshape(-1, 1)
                   optimizer.zero_grad()
 
-                  outputs = model(LStack, inputs)
+                  #outputs = model(LStack, inputs)
+                  outputs = model(LdStack, LuStack, inputs)
                   loss = criterion(outputs, labels)
                   loss.backward()
                   optimizer.step()
@@ -137,7 +159,8 @@ for i in range(1):
 
             my_loss.append( last_loss )
             model.eval()
-            out = model(LStack, y.reshape(-1, 1) )
+            #out = model(LStack, y.reshape(-1, 1) )
+            out = model(LdStack, LuStack, y.reshape(-1, 1) ) 
             #my_acc.append( my_accuracy( out, y_real.reshape(-1, 1), ind ) )
             my_acc.append( MAPE( out, y_real.reshape(-1, 1), ind ) )
             y_norm.append( torch.linalg.norm( P1( out - y_real, B1w, b1b1t_inv ) ).item() )
@@ -171,10 +194,11 @@ for i in range(1):
                   if epoch % 20 == 0:
                         print(' epoch{}  ||   loss: {}, accuracy: {}'.format(epoch, my_loss[-1], my_acc[-1]))
 
-      model = SCCGNNb( K = K, L = L, variance = 1.0, device = device )
+      model = SCCGNNd( K = K, L = L, variance = 1.0, device = device )
       model.load_state_dict( torch.load(model_path_val) )
       model.eval()
-      out = model(LStack, y.reshape(-1, 1) )
+      #out = model(LStack, y.reshape(-1, 1) )
+      out = model(LdStack, LuStack, y.reshape(-1, 1) )
       fin_loss = criterion( out, y_real)
       #fin_acc =  my_accuracy( out, y_real.reshape(-1, 1), ind )
       fin_acc =  MAPE( out, y_real.reshape(-1, 1), ind )
@@ -182,16 +206,17 @@ for i in range(1):
       fin_z_norm = torch.linalg.norm( P2( out - y_real, B2w, b2tb2_inv ) ).item()
       fin_h_norm = torch.linalg.norm( out - y_real - P1( out - y_real, B1w, b1b1t_inv ) - P2( out - y_real, B2w, b2tb2_inv ) ).item()
 
-      print()
-      print("--------------------------------------")
-      print("BEST VALIDATION MODEL:")
-      print("acc: ", round(fin_acc.item(), 4), #round(fin_loss.item(),4), round(fin_y_norm,4), round(fin_z_norm,4), round(fin_h_norm,4), 
-            "  acc/best test: ", round(fin_acc.item()/max(my_acc).item(),4), "  best val acc/best test: ", round(best_acc.item()/max(my_acc).item(),4) )
+#      print()
+#      print("--------------------------------------")
+#      print("BEST VALIDATION MODEL:")
+#      print("acc: ", round(fin_acc.item(), 4), #round(fin_loss.item(),4), round(fin_y_norm,4), round(fin_z_norm,4), round(fin_h_norm,4), 
+#            "  acc/best test: ", round(fin_acc.item()/max(my_acc).item(),4), "  best val acc/best test: ", round(best_acc.item()/max(my_acc).item(),4) )
 
-      model = SCCGNNb( K = K, L = L, variance = 1.0, device = device )
+      model = SCCGNNd( K = K, L = L, variance = 1.0, device = device )
       model.load_state_dict( torch.load(model_path_loss) )
       model.eval()
-      out = model(LStack, y.reshape(-1, 1) )
+      #out = model(LStack, y.reshape(-1, 1) )
+      out = model(LdStack, LuStack, y.reshape(-1, 1) )
       fin_loss = criterion( out, y_real)
       #fin_acc =  my_accuracy( out, y_real.reshape(-1, 1), ind )
       fin_acc =  MAPE( out, y_real.reshape(-1, 1), ind )
@@ -200,25 +225,29 @@ for i in range(1):
       fin_h_norm2 = torch.linalg.norm( out - y_real - P1( out - y_real, B1w, b1b1t_inv ) - P2( out - y_real, B2w, b2tb2_inv ) ).item()
 
 
-      print()
-      print("BEST LOSS MODEL:")
-      print("acc: ", round(fin_acc.item(), 4), #round(fin_loss.item(),4), round(fin_y_norm,4), round(fin_z_norm,4), round(fin_h_norm,4), 
-            "  acc/best test: ", round(fin_acc.item()/max(my_acc).item(),4), "  best val acc/best test: ", round(best_acc.item()/max(my_acc).item(),4) )
-      print( "time: ", str(timedelta(seconds = time()-begin_time)) )
-      print()
-      print() 
+      if is_classical:
+            print("CLASSICAL  acc: ", round(fin_acc.item(), 4) )
+      else:
+            print("SMART ", round(α1, 3), "/", round(α2, 3),  "  acc: ", round(fin_acc.item(), 4) )
+#      print()
+#      print("BEST LOSS MODEL:")
+#      print("acc: ", round(fin_acc.item(), 4), #round(fin_loss.item(),4), round(fin_y_norm,4), round(fin_z_norm,4), round(fin_h_norm,4), 
+#            "  acc/best test: ", round(fin_acc.item()/max(my_acc).item(),4), "  best val acc/best test: ", round(best_acc.item()/max(my_acc).item(),4) )
+#      print( "time: ", str(timedelta(seconds = time()-begin_time)) )
+#      print()
+#      print() 
 
-      print("RATIOS:")
-      nrm = sqrt(y_norm[0]**2 + z_norm[0]**2 + h_norm[0]**2)
-      print("initial: ", round(y_norm[0]/nrm, 4), "/", 
-      round(z_norm[0]/nrm, 4), "/", round(h_norm[0]/nrm, 4))
-      nrm = sqrt(fin_y_norm**2 + fin_z_norm**2 + fin_h_norm**2)
-      print("initial: ", round(fin_y_norm/nrm, 4), "/", round(fin_z_norm/nrm, 4), "/", round(fin_h_norm/nrm, 4))
-      nrm = sqrt(fin_y_norm2**2 + fin_z_norm2**2 + fin_h_norm2**2)
-      print("initial: ", round(fin_y_norm2/nrm, 4), "/", round(fin_z_norm2/nrm, 4), "/", round(fin_h_norm2/nrm, 4)) 
+#      print("RATIOS:")
+#      nrm = sqrt(y_norm[0]**2 + z_norm[0]**2 + h_norm[0]**2)
+#      print("initial: ", round(y_norm[0]/nrm, 4), "/", 
+#      round(z_norm[0]/nrm, 4), "/", round(h_norm[0]/nrm, 4))
+#      nrm = sqrt(fin_y_norm**2 + fin_z_norm**2 + fin_h_norm**2)
+#      print("initial: ", round(fin_y_norm/nrm, 4), "/", round(fin_z_norm/nrm, 4), "/", round(fin_h_norm/nrm, 4))
+#      nrm = sqrt(fin_y_norm2**2 + fin_z_norm2**2 + fin_h_norm2**2)
+#      print("initial: ", round(fin_y_norm2/nrm, 4), "/", round(fin_z_norm2/nrm, 4), "/", round(fin_h_norm2/nrm, 4)) 
 
-      print("--------------------------------------")
-      print()
+#      print("--------------------------------------")
+#      print()
 
 #%%
 import matplotlib.pyplot as plt

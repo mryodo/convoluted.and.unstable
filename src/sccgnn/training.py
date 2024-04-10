@@ -33,7 +33,8 @@ def my_accuracy( output, target, ind  ):
 def MAPE( output, target, ind ):
     abs_error = (torch.abs(target[ind] - output[ind])) / torch.abs(target[ind])
     sum_abs_error = torch.sum(abs_error)
-    mape_loss = (sum_abs_error / target[ind].shape[0]) * 100
+    #mape_loss = (sum_abs_error / target[ind].shape[0]) * 100
+    mape_loss = torch.median( abs_error ) * 100
     return mape_loss
 
 
