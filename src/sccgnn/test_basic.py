@@ -43,7 +43,7 @@ print("Running on: ", device)
 
 
 
-N = 100  # size of simplicial complex
+N = 200  # size of simplicial complex
 
 # IMPORTANT: stable / non-stable flag inside `generateTriangulation`
 Ld, Lu, B1w, B2w, W0inv, W1, W2, edges, trians, n, points, edg2Trig, trig2Edge = generateTriangulation( N, instable = True, device = device )
@@ -162,13 +162,15 @@ for is_classical, α1, α2 in testing_loop:
             #out = model(LStack, y.reshape(-1, 1) )
             out = model(LdStack, LuStack, y.reshape(-1, 1) ) 
             #my_acc.append( my_accuracy( out, y_real.reshape(-1, 1), ind ) )
-            my_acc.append( MAPE( out, y_real.reshape(-1, 1), ind ) )
+            #my_acc.append( MAPE( out, y_real.reshape(-1, 1), ind ) )
+            my_acc.append( ebli( out, y_real.reshape(-1, 1), ind ) )
             y_norm.append( torch.linalg.norm( P1( out - y_real, B1w, b1b1t_inv ) ).item() )
             z_norm.append( torch.linalg.norm( P2( out - y_real, B2w, b2tb2_inv ) ).item() )
             h_norm.append( torch.linalg.norm( out - y_real - P1( out - y_real, B1w, b1b1t_inv ) - P2( out - y_real, B2w, b2tb2_inv ) ).item() )
 
             #val_acc = my_val_accuracy( out, y_real.reshape(-1, 1), val_ind )
-            val_acc = MAPE( out, y_real.reshape(-1, 1), val_ind )
+            #val_acc = MAPE( out, y_real.reshape(-1, 1), val_ind )
+            val_acc = ebli( out, y_real.reshape(-1, 1), val_ind )
             my_val_acc.append( val_acc )
 
             if val_acc < best_acc and epoch > 0.9 * MAX_EPOCH:
@@ -201,7 +203,8 @@ for is_classical, α1, α2 in testing_loop:
       out = model(LdStack, LuStack, y.reshape(-1, 1) )
       fin_loss = criterion( out, y_real)
       #fin_acc =  my_accuracy( out, y_real.reshape(-1, 1), ind )
-      fin_acc =  MAPE( out, y_real.reshape(-1, 1), ind )
+      #fin_acc =  MAPE( out, y_real.reshape(-1, 1), ind )
+      fin_acc =  ebli( out, y_real.reshape(-1, 1), ind )
       fin_y_norm = torch.linalg.norm( P1( out - y_real, B1w, b1b1t_inv ) ).item()
       fin_z_norm = torch.linalg.norm( P2( out - y_real, B2w, b2tb2_inv ) ).item()
       fin_h_norm = torch.linalg.norm( out - y_real - P1( out - y_real, B1w, b1b1t_inv ) - P2( out - y_real, B2w, b2tb2_inv ) ).item()
@@ -219,7 +222,8 @@ for is_classical, α1, α2 in testing_loop:
       out = model(LdStack, LuStack, y.reshape(-1, 1) )
       fin_loss = criterion( out, y_real)
       #fin_acc =  my_accuracy( out, y_real.reshape(-1, 1), ind )
-      fin_acc =  MAPE( out, y_real.reshape(-1, 1), ind )
+      #fin_acc =  MAPE( out, y_real.reshape(-1, 1), ind )
+      fin_acc =  ebli( out, y_real.reshape(-1, 1), ind )
       fin_y_norm2 = torch.linalg.norm( P1( out - y_real, B1w, b1b1t_inv ) ).item()
       fin_z_norm2 = torch.linalg.norm( P2( out - y_real, B2w, b2tb2_inv ) ).item()
       fin_h_norm2 = torch.linalg.norm( out - y_real - P1( out - y_real, B1w, b1b1t_inv ) - P2( out - y_real, B2w, b2tb2_inv ) ).item()

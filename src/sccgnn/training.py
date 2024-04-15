@@ -37,6 +37,10 @@ def MAPE( output, target, ind ):
     mape_loss = torch.median( abs_error ) * 100
     return mape_loss
 
+def ebli( output, target, ind, thr = 0.1 ):
+      abs_error = (torch.abs(target[ind] - output[ind])) / torch.abs(target[ind])
+      return torch.sum( abs_error < thr ) / target[ind].shape[0] * 100 
+       
 
 def my_val_accuracy( output, target, val_ind  ):
       
