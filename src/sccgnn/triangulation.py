@@ -46,7 +46,54 @@ def getTrig2Edge( edges2, trigs2, edg2Trig ):
       return trig2Edg
 
 
-def generateTriangulation( N = 10, instable = False, device = "cpu" ):
+def getIndx2Kill( edges ):
+      return torch.randint( edges.shape[0]-4, ( 1, 1 ) ).item()
+
+def killEdge(indx, n, edges, trigs):
+    out = edges[ indx ]
+    edges2 = np.delete( edges, indx, axis = 0 )
+    out_trigs = []
+    for i in range( trigs.shape[0] ):
+      trig = trigs[ i, : ] 
+      if ((trig[0] == out[0]) and (trig[1] == out[1])) or ((trig[0] == out[0]) and (trig[2] == out[1])) or ((trig[1] == out[0]) and (trig[2] == out[1])):
+            out_trigs.append( i )
+
+    trigs2 = np.delete( trigs, out_trigs, axis = 0 ) 
+
+    return edges2, trigs2
+
+def getNewEdge2(allEdges):
+    ind = torch.randint( allEdges.shape[0], ( 1, 1 ) ).item()
+    new_edge = allEdges[ ind, :]
+    allEdges = np.delete( allEdges, ind, axis = 0 )
+    return new_edge, allEdges
+
+def addEdge(new_edge, n, edges, trigs):
+      edges2 = np.vstack( [edges, new_edge] )
+      edges2 = np.sort( edges2, axis = 1 )
+      edges2 = edges2[np.lexsort((edges2[:, 1], edges2[:, 0]))]
+
+      new_trigs = []
+      for i in range( n ):
+            if (i != new_edge[0]) and (i != new_edge[1]):
+                  if ( sum( ( edges == np.sort([[new_edge[0], i]]) ).all(axis=1) ) == 1 ) and ( sum( ( edges == np.sort([[new_edge[1], i]]) ).all(axis=1) ) == 1 ) :
+                        add = new_edge.tolist() + [i]
+                        add.sort()
+                        new_trigs.append( add )
+      if len(new_trigs) > 0:
+            
+            new_trigs = np.array( new_trigs )      
+            #print(new_trigs)
+            trigs2 = np.vstack( [trigs, new_trigs] )
+            trigs2 = np.sort( trigs2, axis = 1 )
+            trigs2 = trigs2[np.lexsort(( trigs2[:, 2], trigs2[:, 1], trigs2[:, 0]))]
+      
+            return edges2, trigs2
+      else: 
+            return edges2, trigs
+
+
+def generateTriangulation( N = 10, instable = False, ν = 0.5, device = "cpu" ):
       points = np.random.rand( N, 2) * 0.8 + 0.1
       points = np.vstack([ points, np.array([ [ 0, 0], [1, 0], [0, 1], [1, 1]]) ])
 
@@ -60,9 +107,30 @@ def generateTriangulation( N = 10, instable = False, device = "cpu" ):
       row = torch.randint(trians.shape[0], size = (1, 1))[0][0].item()
       trians = trians[torch.arange(1, trians.shape[0]+1) != row, ...]
       row = torch.randint(trians.shape[0], size = (1, 1))[0][0].item()
-      trians = trians[torch.arange(1, trians.shape[0]+1) != row, ...]
+      trigs = trians[torch.arange(1, trians.shape[0]+1) != row, ...]
 
       edges = delaunay2edges(tri)
+
+      ν_init = edges.shape[0] / ( ( N + 4) * ( N + 3 ) / 2 )
+      backlash = int( - edges.shape[0] + round( ν * n * (n-1) / 2 ) )
+
+      if backlash < 0:
+            for i in range( 1, -backlash):
+                  ind = getIndx2Kill( edges )
+                  edges, trigs = killEdge(ind, n, edges, trigs)
+      else:
+            allEdges = [ ]
+            for i in range(0, (n-1) ):
+                  for j in range( (i+1), n ):
+                        allEdges.append( [ i, j ] )
+            allEdges = np.array( allEdges )
+
+            for i in range( edges.shape[0] ):
+                  indx = ( allEdges == edges[i, :]).all(axis=1).nonzero()[0][0]
+                  allEdges = np.delete( allEdges, indx, axis = 0 ) 
+            for i in range( backlash ):
+                  new_edge, allEdges = getNewEdge2( allEdges )
+                  edges, trigs = addEdge(new_edge, n, edges, trigs)
 
       B1 = B1fromEdges( n, edges )
       B2 = B2fromTrig( edges, trians )

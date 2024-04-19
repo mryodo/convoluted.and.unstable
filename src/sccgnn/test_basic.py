@@ -43,10 +43,10 @@ print("Running on: ", device)
 
 
 
-N = 200  # size of simplicial complex
+N = 100  # size of simplicial complex
 
 # IMPORTANT: stable / non-stable flag inside `generateTriangulation`
-Ld, Lu, B1w, B2w, W0inv, W1, W2, edges, trians, n, points, edg2Trig, trig2Edge = generateTriangulation( N, instable = True, device = device )
+Ld, Lu, B1w, B2w, W0inv, W1, W2, edges, trians, n, points, edg2Trig, trig2Edge = generateTriangulation( N, instable = True, ν =0.2, device = device )
 b1b1t_inv = torch.linalg.pinv( (B1w @ B1w.T).to_dense() ).to_sparse()
 b2tb2_inv = torch.linalg.pinv( (B2w.T @ B2w).to_dense() ).to_sparse()
 topeig = get_top_eig(Lu, Ld, device = device)
@@ -69,7 +69,7 @@ y = output_generator( m1, W1, edg2Trig, var = var, device = device )
 y_real = y.clone()
 
 # define missing entries
-dropRate = 0.250
+dropRate = 0.350
 valRate = 0.125
 
 ind, val_ind, saved = get_missing( m1, dropRate, valRate, device = device )
@@ -173,7 +173,7 @@ for is_classical, α1, α2 in testing_loop:
             val_acc = ebli( out, y_real.reshape(-1, 1), val_ind )
             my_val_acc.append( val_acc )
 
-            if val_acc < best_acc and epoch > 0.9 * MAX_EPOCH:
+            if val_acc > best_acc and epoch > 0.9 * MAX_EPOCH:
             #best_loss = my_loss[-1]
                   best_acc = val_acc
                   if is_classical:
